@@ -103,12 +103,6 @@ class GoogLeNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-
-
-
-
-
-
 class conv_block(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(conv_block, self).__init__()
