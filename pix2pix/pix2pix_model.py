@@ -68,15 +68,6 @@ def Generator(): #~unet
 
     x = last(x)
 
-    # for layer in down_stack:
-    #     x = layer(x)
-
-    # for layer in up_stack: # len(skips)=4
-    #     x = layer(x)
-
-    # x = last(x)
-
-
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
@@ -101,7 +92,7 @@ def Discriminator():
 
 
 def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"): 
-    LAMBDA1 = 10
+    LAMBDA1 = 1
     LAMBDA2 = 0.01
     if mode == "BCE":
         # adversarial loss1(BCE)
@@ -123,7 +114,7 @@ def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"):
     return total_gan_loss, gan_loss, l1_loss, em_distance
 
 
-def discriminator_loss(disc_real_output, disc_generated_output, mode="BCE"):
+def discriminator_loss(disc_real_output, disc_generated_output, gen_output, target, mode="BCE"):
 
     if mode =="BCE":
         # adversarial loss(BCE)
@@ -134,11 +125,10 @@ def discriminator_loss(disc_real_output, disc_generated_output, mode="BCE"):
         total_disc_loss = real_loss + generated_loss
     elif mode =="WGAN":
         # adversarial loss(WGAN==mean)
-        real_loss = tf.reduce_mean(disc_real_output) - tf.reduce_mean(disc_generated_output)
+        real_loss = tf.reduce_mean(disc_real_output)
         generated_loss = tf.reduce_mean(disc_generated_output)
 
-        total_disc_loss = real_loss - generated_loss
-
+        total_disc_loss = -real_loss + generated_loss
     # elif mode == "MSE":
     #     # discriminator에 sigmoid acti쓰면안됨.
     #     total_disc_loss = tf.math.square(disc_real_output-disc_generated_output)

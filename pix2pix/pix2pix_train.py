@@ -21,13 +21,36 @@ NUM = 7
 MODE = "WGAN"
 CHECKPOINT_DIR = "./pix2pix/training_checkpoints"
 CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, str(NUM))
+GP_WEIGHT = 10
 
 BATCH_SIZE = 128
 IMSHAPE = [32, 128, 3]
 
+@tf.function
+def interpolate(gen_output, target, discriminator):
+    b = target.shape[0]
+    alpha = tf.random.uniform(shape=[b,1,1,1])
+    alpha = tf.broadcast_to(alpha,shape=target.shape)
+    interpolated = tf.multiply(alpha, target) + tf.multiply((1-alpha),gen_output)
+    
+    prob_interpolated = discriminator([interpolated, target], training=False)
+    gradients = tf.gradients(prob_interpolated ,interpolated)
+
+    return gradients
+
+def gradient_panelty(gen_output, target, discriminator):
+    # 참고 https://github.com/EmilienDupont/wgan-gp/blob/ef82364f2a2ec452a52fbf4a739f95039ae76fe3/training.py#L73
+    b = target.shape[0]
+    gradients = interpolate(gen_output, target, discriminator)[0]
+    gradients = tf.reshape(gradients,(b, 32*128*3)) # flatten
+    gradients_norm = tf.math.sqrt(tf.math.reduce_sum(tf.math.square(gradients)+1e-12, axis=1))
+
+    return tf.math.reduce_mean(tf.math.square(gradients_norm-1))
 
 #@tf.function
 def train_step(generator, discriminator, input_image, target, step, summary_writer):
+
+    # TODO loop로 discriminator먼저 학습(5) & generator 학습
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         gen_output = generator(input_image, training=True)
 
@@ -37,8 +60,12 @@ def train_step(generator, discriminator, input_image, target, step, summary_writ
         disc_real_output = discriminator([input_image, target], training=True)
         disc_generated_output = discriminator([input_image, gen_output], training=True)
 
+        gp = gradient_panelty(gen_output, target, discriminator)
+
         gen_total_loss, gen_gan_loss, gen_l1_loss, em_distance = generator_loss(disc_generated_output, gen_output, target, mode=MODE)
-        disc_loss, real_loss, generated_loss = discriminator_loss(disc_real_output, disc_generated_output, mode=MODE)
+        disc_loss, real_loss, generated_loss = discriminator_loss(disc_real_output, disc_generated_output, gen_output, target, mode=MODE)
+        disc_loss += GP_WEIGHT*gp
+
 
     generator_gradients = gen_tape.gradient(gen_total_loss, generator.trainable_variables)
     discriminator_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -54,6 +81,7 @@ def train_step(generator, discriminator, input_image, target, step, summary_writ
         tf.summary.scalar('disc_loss(real+generated)', disc_loss, step=step)
         tf.summary.scalar('disc_real_loss', real_loss, step=step)
         tf.summary.scalar('disc_generated_loss', generated_loss, step=step)
+        tf.summary.scalar('gradient_panelty', gp, step=step)
     
 
 def fit(generator, discrimiantor, train_ds, val_ds, steps, num_batch, checkpoint_prefix):

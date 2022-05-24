@@ -14,7 +14,7 @@ TF_TRAIN_DIR = "./tf_records/synthetic/train/*.tfrecords"
 TF_VAL_DIR = "./tf_records/synthetic/val/*.tfrecords"
 TF_TEST_DIR = "./tf_records/synthetic/test/*.tfrecords"
 
-NUM = 5 # 읽어올 모델
+NUM = 7 # 읽어올 모델
 CHECKPOINT_DIR = "./pix2pix/training_checkpoints"
 CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, str(NUM))
 
