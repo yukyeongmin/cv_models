@@ -7,7 +7,7 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
 import cv2
 
 from pix2pix_model import Generator, Discriminator
-from load_tfrecords import load_tfrecords
+from load_tfrecords import load_tfrecords_batch
 from utils import inverse_tone_mapping, tone_mapping, histogram
 
 TF_TRAIN_DIR = "./tf_records/synthetic/train/*.tfrecords"
@@ -21,7 +21,7 @@ CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, str(NUM))
 BATCH_SIZE = 128
 IMSHAPE = [32, 128, 3]
 
-test_ds = load_tfrecords(TF_TEST_DIR)
+test_ds = load_tfrecords_batch(TF_TEST_DIR)
 
 generator = Generator()
 discriminator = Discriminator()

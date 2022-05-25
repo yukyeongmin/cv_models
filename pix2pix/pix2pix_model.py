@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
-from utils import inverse_tone_mapping, compare_bright
+from utils import inverse_tone_mapping, compare_luminance
 
 def downsampling(filters, size, apply_batchnorm=True):
     initializer = tf.random_normal_initializer(0., 0.02)
@@ -93,14 +93,14 @@ def Discriminator():
 
 def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"): 
     LAMBDA1 = 1
-    LAMBDA2 = 0.01
+    LAMBDA2 = 1
     if mode == "BCE":
         # adversarial loss1(BCE)
         loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
     elif mode == "WGAN":
         # adversarial loss2(WGAN==mean)
-        gan_loss = tf.reduce_mean(disc_generated_output)
+        gan_loss = -tf.reduce_mean(disc_generated_output)
 
     # mean absolute error
     target_ = inverse_tone_mapping(target)
@@ -108,7 +108,7 @@ def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"):
     l1_loss = tf.reduce_mean(tf.abs(target-gen_output))
 
     # wasserstein distance
-    em_distance = compare_bright(gen_output_, target_)
+    em_distance = compare_luminance(gen_output_, target_)
     total_gan_loss = gan_loss + (LAMBDA1*l1_loss) + (LAMBDA2*em_distance)
 
     return total_gan_loss, gan_loss, l1_loss, em_distance

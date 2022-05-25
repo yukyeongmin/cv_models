@@ -26,10 +26,11 @@ def wasserstein_distance(x, y, n):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.wasserstein_distance.html
     
     n = n
-    x_sorter = x[1]
     x = x[0] # 내림차순
-    y_sorter = y[1]
     y = y[0]
+
+    x_sorter = np.arange(0,n)[::-1]
+    y_sorter = np.arange(0,n)[::-1]
 
     x = tf.cast(x, dtype=tf.float32)
     y = tf.cast(y, dtype=tf.float32)
@@ -55,17 +56,17 @@ def wasserstein_distance(x, y, n):
     output = tf.math.multiply(output, deltas)
     output = tf.math.reduce_sum(output)
 
-    return output   # sum of em_distance of a batch
+    return output/128   # mean of em_distance of a batch
 
-def compare_bright(img1, img2):
+def compare_luminance(img1, img2):
     # 3 channel이미지를 1d로 만든뒤
     # 상위 100개의 pixel값만 비교
 
-    # n = 100
+    n = 100
     b,w,h,c =img1.shape
-    n = w*h*c
-    img1 = tf.reshape(img1,(b,n))
-    img2 = tf.reshape(img2,(b,n))
+    # n = w*h*c
+    img1 = tf.reshape(img1,(b,-1))
+    img2 = tf.reshape(img2,(b,-1))
     
     top_values1 = tf.math.top_k(img1,k=n) # value, sorted_index
     top_values2 = tf.math.top_k(img2,k=n)
