@@ -29,23 +29,23 @@ def wasserstein_distance(x, y, n):
     x = x[0] # 내림차순
     y = y[0]
 
-    x_sorter = np.arange(0,n)[::-1]
-    y_sorter = np.arange(0,n)[::-1]
+    # x_sorter = np.arange(0,n)[::-1]
+    # y_sorter = np.arange(0,n)[::-1]
 
     x = tf.cast(x, dtype=tf.float32)
     y = tf.cast(y, dtype=tf.float32)
-    x_sorter = tf.cast(x_sorter,dtype=tf.float32)
-    y_sorter = tf.cast(y_sorter,dtype=tf.float32)
+    # x_sorter = tf.cast(x_sorter,dtype=tf.float32)
+    # y_sorter = tf.cast(y_sorter,dtype=tf.float32)
 
-    all_values = tf.concat([x,y],1)
+    all_values = tf.concat([x,y],-1)
     all_values = tf.sort(all_values)
 
-    deltas = tf.math.subtract(all_values[:,1:], all_values[:,:-1])
+    deltas = tf.math.subtract(all_values[:,:,1:], all_values[:,:,:-1])
 
-    x = x[::-1] # 오름차순
-    y = y[::-1]
-    x_cdf_indices = tf.searchsorted(x, all_values[:,:-1], side="right")
-    y_cdf_indices = tf.searchsorted(y, all_values[:,:-1], side="right")
+    x = x[:,:,::-1] # 오름차순
+    y = y[:,:,::-1]
+    x_cdf_indices = tf.searchsorted(x, all_values[:,:,:-1], side="right")
+    y_cdf_indices = tf.searchsorted(y, all_values[:,:,:-1], side="right")
     x_cdf_indices = tf.cast(x_cdf_indices, dtype=tf.float32)
     y_cdf_indices = tf.cast(y_cdf_indices, dtype=tf.float32)
 
@@ -59,16 +59,19 @@ def wasserstein_distance(x, y, n):
     return output/128   # mean of em_distance of a batch
 
 def compare_luminance(img1, img2):
-    # 3 channel이미지를 1d로 만든뒤
-    # 상위 100개의 pixel값만 비교
+    # 각 채널에서 상위 50개의 픽셀을 뽑아 거리 측정
+    # 총 150 픽셀 비교
 
-    n = 100
+    n = 50
     b,w,h,c =img1.shape
     # n = w*h*c
-    img1 = tf.reshape(img1,(b,-1))
-    img2 = tf.reshape(img2,(b,-1))
+    img1 = tf.reshape(img1,(b,-1,3))
+    img2 = tf.reshape(img2,(b,-1,3))
+
+    img1 = tf.transpose(img1,[0,2,1]) # top_k가 마지막 채널에 대해서 계산하기 때문
+    img2 = tf.transpose(img2,[0,2,1])
     
-    top_values1 = tf.math.top_k(img1,k=n) # value, sorted_index
+    top_values1 = tf.math.top_k(img1,k=n) # return sorted_value, sorted_index
     top_values2 = tf.math.top_k(img2,k=n)
     output = wasserstein_distance(top_values1, top_values2, n)
 
