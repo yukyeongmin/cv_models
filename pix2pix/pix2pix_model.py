@@ -84,7 +84,7 @@ def Discriminator():
     down3 = downsampling(256,4)(down2)                  # n,4,16,256
  
     conv = tf.keras.layers.Conv2D(512,4,strides=1, padding="same", kernel_initializer=initializer, use_bias=False)(down3) # n,4,16,512
-    batchnorm1 = tf.keras.layers.BatchNormalization()(conv)
+    batchnorm1 = tfa.layers.InstanceNormalization()(conv)
     leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
     last = tf.keras.layers.Conv2D(1,4,strides=1,padding="same",activation="sigmoid", kernel_initializer=initializer)(leaky_relu)                 # n,4,16,512
 
@@ -92,8 +92,8 @@ def Discriminator():
 
 
 def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"): 
-    LAMBDA1 = 1
-    LAMBDA2 = 1
+    LAMBDA1 = 10
+    LAMBDA2 = 0.1
     if mode == "BCE":
         # adversarial loss1(BCE)
         loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)

@@ -29,13 +29,8 @@ def wasserstein_distance(x, y, n):
     x = x[0] # 내림차순
     y = y[0]
 
-    # x_sorter = np.arange(0,n)[::-1]
-    # y_sorter = np.arange(0,n)[::-1]
-
     x = tf.cast(x, dtype=tf.float32)
     y = tf.cast(y, dtype=tf.float32)
-    # x_sorter = tf.cast(x_sorter,dtype=tf.float32)
-    # y_sorter = tf.cast(y_sorter,dtype=tf.float32)
 
     all_values = tf.concat([x,y],-1)
     all_values = tf.sort(all_values)
