@@ -35,12 +35,12 @@ def wasserstein_distance(x, y, n):
     all_values = tf.concat([x,y],-1)
     all_values = tf.sort(all_values)
 
-    deltas = tf.math.subtract(all_values[:,:,1:], all_values[:,:,:-1])
+    deltas = tf.math.subtract(all_values[:,1:], all_values[:,:-1])
 
-    x = x[:,:,::-1] # 오름차순
-    y = y[:,:,::-1]
-    x_cdf_indices = tf.searchsorted(x, all_values[:,:,:-1], side="right")
-    y_cdf_indices = tf.searchsorted(y, all_values[:,:,:-1], side="right")
+    x = x[:,::-1] # 오름차순
+    y = y[:,::-1]
+    x_cdf_indices = tf.searchsorted(x, all_values[:,:-1], side="right")
+    y_cdf_indices = tf.searchsorted(y, all_values[:,:-1], side="right")
     x_cdf_indices = tf.cast(x_cdf_indices, dtype=tf.float32)
     y_cdf_indices = tf.cast(y_cdf_indices, dtype=tf.float32)
 
@@ -54,17 +54,16 @@ def wasserstein_distance(x, y, n):
     return output/128   # mean of em_distance of a batch
 
 def compare_luminance(img1, img2):
-    # 각 채널에서 상위 50개의 픽셀을 뽑아 거리 측정
-    # 총 150 픽셀 비교
+    # 채널을 고려하지 않고 상위 100개 픽셀만 비교
 
-    n = 50
+    n = 100
     b,w,h,c =img1.shape
     # n = w*h*c
-    img1 = tf.reshape(img1,(b,-1,3))
-    img2 = tf.reshape(img2,(b,-1,3))
+    img1 = tf.reshape(img1,(b,-1))
+    img2 = tf.reshape(img2,(b,-1))
 
-    img1 = tf.transpose(img1,[0,2,1]) # top_k가 마지막 채널에 대해서 계산하기 때문
-    img2 = tf.transpose(img2,[0,2,1])
+    # img1 = tf.transpose(img1,[0,2,1]) # top_k가 마지막 채널에 대해서 계산하기 때문
+    # img2 = tf.transpose(img2,[0,2,1])
     
     top_values1 = tf.math.top_k(img1,k=n) # return sorted_value, sorted_index
     top_values2 = tf.math.top_k(img2,k=n)
@@ -81,7 +80,7 @@ def get_sample(ldr, hdr, target, n_sample):
 
     return selected_ldr, selected_hdr, selected_target
 
-def plot_images(model, test_input, target, epoch, save_dir):
+def plot_images(model, test_input, target, epoch, save_dir, title="validation images"):
     prediction = model(test_input, training=False)
     plt.figure(figsize = (15,5))
 
@@ -90,14 +89,25 @@ def plot_images(model, test_input, target, epoch, save_dir):
     title = ["Input Image", "Ground Truth", "Predicted Image"]
 
     for i in range(3):
-        plt.subplot(1,3,i+1)
+        plt.subplot(2,3,i+1)
         plt.title(title[i])
 
         plt.imshow(display_list[i])
         plt.axis("off")
 
+    display_list = [test_input[-1]*0.5+0.5, target[-1]*0.5+0.5, prediction[-1]*0.5+0.5]
+
+    for i in range(3):
+        plt.subplot(2,3,i+4)
+        plt.title(title[i])
+
+        plt.imshow(display_list[i])
+        plt.axis("off")
+
+
     file_name = "generated_e{0:03d}".format(epoch)
     save_path = os.path.join(save_dir,file_name)
+    plt.title(title)
     plt.savefig(save_path)
 
 def histogram(img, title="histogram"):

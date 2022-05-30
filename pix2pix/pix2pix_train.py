@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import time
 
-from load_tfrecords import load_tfrecords, get_batch, load_tfrecords_batch
+from load_tfrecords import load_tfrecords_batch
 from utils import plot_images
 from pix2pix_model import Generator, Discriminator, generator_loss, discriminator_loss
 
@@ -15,37 +15,42 @@ TF_TRAIN_DIR = "./tf_records/synthetic/train/*.tfrecords"
 TF_VAL_DIR = "./tf_records/synthetic/val/*.tfrecords"
 TF_TEST_DIR = "./tf_records/synthetic/test/*.tfrecords"
 
-NUM = 10
+NUM = 16
 MODE = "WGAN"
 CHECKPOINT_DIR = "./pix2pix/training_checkpoints"
 CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, str(NUM))
 GP_WEIGHT = 10
-N_CRITIC = 3
 
 BATCH_SIZE = 128
 IMSHAPE = [32, 128, 3]
 
-@tf.function
-def interpolate(gen_output, target, discriminator):
+
+def interpolate(gen_output, target):
     b = target.shape[0]
     alpha = tf.random.uniform(shape=[b,1,1,1])
     interpolated = tf.multiply(alpha, target) + tf.multiply((1-alpha),gen_output)
     
-    prob_interpolated = discriminator([interpolated, target], training=False)
-    gradients = tf.gradients(prob_interpolated ,interpolated)
+    return interpolated
 
-    return gradients
 
 def gradient_panelty(gen_output, target, discriminator):
     # https://github.com/EmilienDupont/wgan-gp/blob/ef82364f2a2ec452a52fbf4a739f95039ae76fe3/training.py#L73
+    # https://github.com/Mohammad-Rahmdel/WassersteinGAN-GradientPenalty-Tensorflow/blob/master/WGAN-GP_MNIST.ipynb
     b = target.shape[0]
-    gradients = interpolate(gen_output, target, discriminator)[0]
-    gradients = tf.reshape(gradients,(b, -1)) # flatten
-    gradients_norm = tf.math.sqrt(tf.math.reduce_sum(tf.math.square(gradients), axis=-1)+1e-12)
+    interpolated = interpolate(gen_output, target)
 
-    return tf.math.reduce_mean(tf.math.square(gradients_norm-1))
+    with tf.GradientTape() as t:
+        t.watch(interpolated)
+        d_hat = discriminator([interpolated, target], training = False)
 
-@tf.function
+    gradients = t.gradient(d_hat, interpolated)
+    # gradients = tf.reshape(gradients,(b, -1)) # flatten
+    gradients_norm = tf.math.sqrt(tf.math.reduce_sum(tf.math.square(gradients), axis=[1,2])+1e-12)
+    gradients_norm = tf.math.reduce_mean(tf.math.square(gradients_norm-1))
+
+    return gradients_norm
+
+#@tf.function
 def train_step(generator, discriminator, input_image, target, step, summary_writer):
 
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
@@ -79,7 +84,7 @@ def train_step(generator, discriminator, input_image, target, step, summary_writ
     
 
 def fit(generator, discrimiantor, train_ds, val_ds, steps, num_batch, checkpoint_prefix):
-    ldr_input, hdr_target = next(iter(val_ds.take(1)))
+    ldr_input_val, hdr_target_val = next(iter(val_ds.take(1)))
     start = time.time()
     epoch = 0
 
@@ -87,13 +92,14 @@ def fit(generator, discrimiantor, train_ds, val_ds, steps, num_batch, checkpoint
 
     summary_writer = tf.summary.create_file_writer(log_dir + "fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
-    for step, (ldr_input, hdr_target) in train_ds.repeat().take(steps).enumerate():
+    for step, (ldr_input_train, hdr_target_train) in train_ds.repeat().take(steps).enumerate():
         if step % num_batch == 0:
             epoch += 1
             if epoch % 5 == 0:
-                plot_images(generator, ldr_input, hdr_target, epoch, save_dir= checkpoint_prefix) 
+                plot_images(generator, ldr_input_val, hdr_target_val, epoch, save_dir= checkpoint_prefix) 
+                # plot_images(generator, ldr_input_train, hdr_target_train, epoch, save_dir= checkpoint_prefix, title="training images") 
                 checkpoint.save(file_prefix=checkpoint_prefix)    
-        train_step(generator, discrimiantor, ldr_input, hdr_target, step, summary_writer)
+        train_step(generator, discrimiantor, ldr_input_train, hdr_target_train, step, summary_writer)
 
 
 if __name__== "__main__":
@@ -101,7 +107,7 @@ if __name__== "__main__":
     # gpus = tf.config.experimental.list_physical_devices('GPU')
     # if gpus:
     #     try:
-    #         tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
+    #         tf.config.experimental.set_visible_devices(gpus[1], 'GPU')
     #     except RuntimeError as e:
     #         print(e)
             
@@ -128,6 +134,6 @@ if __name__== "__main__":
     os.makedirs(CHECKPOINT_PREFIX, exist_ok=True)
 
 
-    fit(generator, discriminator, train_ds, val_ds, 30000, num_batch, checkpoint_prefix=CHECKPOINT_PREFIX)
+    fit(generator, discriminator, train_ds, val_ds, 50000, num_batch, checkpoint_prefix=CHECKPOINT_PREFIX)
     
 

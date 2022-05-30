@@ -14,12 +14,20 @@ TF_TRAIN_DIR = "./tf_records/synthetic/train/*.tfrecords"
 TF_VAL_DIR = "./tf_records/synthetic/val/*.tfrecords"
 TF_TEST_DIR = "./tf_records/synthetic/test/*.tfrecords"
 
-NUM = 10 # 읽어올 모델
+NUM = 15 # 읽어올 모델
 CHECKPOINT_DIR = "./pix2pix/training_checkpoints"
+CHECKPOINT_PATH = "./pix2pix/training_checkpoints/15-15"
 CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, str(NUM))
 
 BATCH_SIZE = 128
 IMSHAPE = [32, 128, 3]
+
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# if gpus:
+#     try:
+#         tf.config.experimental.set_visible_devices(gpus[1], 'GPU')
+#     except RuntimeError as e:
+#         print(e)
 
 test_ds = load_tfrecords_batch(TF_TEST_DIR)
 
@@ -34,8 +42,8 @@ checkpoint = tf.train.Checkpoint(generator_optimizer = generator_optimizer,
                                 generator = generator,
                                 discriminator = discriminator)
 
-print(tf.train.latest_checkpoint(CHECKPOINT_DIR))
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir=CHECKPOINT_DIR))
+print(tf.train.latest_checkpoint(CHECKPOINT_PATH))
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir=CHECKPOINT_PATH))
 
 file_name = "after_training"
 save_path = os.path.join(CHECKPOINT_PREFIX,file_name)
@@ -55,8 +63,8 @@ for batch, (input_image, target) in test_ds.take(10).enumerate():
     cv2.imwrite("origin.exr",ori_img)
 
     # histogram 확인
-    histogram(ori_img,"origin")
-    histogram(save_img,"prediction")
+    #histogram(ori_img,"origin")
+    #histogram(save_img,"prediction")
 
     target = target[:5]
     target_ = tone_mapping(target)

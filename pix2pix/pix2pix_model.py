@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 from utils import inverse_tone_mapping, compare_luminance
 
-def downsampling(filters, size, apply_batchnorm=True):
+def downsampling(filters, size, apply_instancenorm=True):
     initializer = tf.random_normal_initializer(0., 0.02)
 
     result = tf.keras.Sequential()
@@ -10,7 +10,7 @@ def downsampling(filters, size, apply_batchnorm=True):
         tf.keras.layers.Conv2D(filters, size, strides=2, padding="same", kernel_initializer=initializer, use_bias=False)
     )
 
-    if apply_batchnorm:
+    if apply_instancenorm:
         result.add(tfa.layers.InstanceNormalization())
     result.add(tf.keras.layers.LeakyReLU())
 
@@ -34,17 +34,18 @@ def Generator(): #~unet
     inputs = tf.keras.layers.Input(shape=[32,128,3])
 
     down_stack=[
-        downsampling(64,4,apply_batchnorm=False),       # n,16,64,64
+        downsampling(64,4,apply_instancenorm=False),       # n,16,64,64
         downsampling(128,4),                            # n,8,32,128
         downsampling(256,4),                            # n,4,16,256
         downsampling(512,2),                            # n,2,8,512
         downsampling(512,2)                             # n,1,4,512
     ]
     up_stack=[
-        upsampling(512,2,apply_dropout=True),           # n,2,8,256
-        upsampling(256,4),                              # n,4,16,128
-        upsampling(128,4),                               # n,8,32,64
-        upsampling(64,4),                                # n,16,64,32
+        upsampling(512,2,apply_dropout=True),           # n,2,8,512
+        upsampling(512,2,apply_dropout=True),           # n,4,16,512
+        upsampling(256,4),                              # n,8,32,256
+        upsampling(128,4),                               # n,16,64,128
+        #upsampling(64,4),                                # n,32,128,64
     ]
 
     initializer = tf.random_normal_initializer(0.,0.02)
@@ -79,21 +80,21 @@ def Discriminator():
 
     x = tf.keras.layers.concatenate([input, target])    # n,32,128,6
 
-    down1 = downsampling(64,4,apply_batchnorm=False)(x) # n,16,64,64
+    down1 = downsampling(64,4,apply_instancenorm=False)(x) # n,16,64,64
     down2 = downsampling(128,4)(down1)                  # n,8,32,128
     down3 = downsampling(256,4)(down2)                  # n,4,16,256
  
     conv = tf.keras.layers.Conv2D(512,4,strides=1, padding="same", kernel_initializer=initializer, use_bias=False)(down3) # n,4,16,512
     batchnorm1 = tfa.layers.InstanceNormalization()(conv)
     leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
-    last = tf.keras.layers.Conv2D(1,4,strides=1,padding="same",activation="sigmoid", kernel_initializer=initializer)(leaky_relu)                 # n,4,16,512
+    last = tf.keras.layers.Conv2D(1,4,strides=1,padding="same", kernel_initializer=initializer)(leaky_relu)                 # n,4,16,512
 
     return tf.keras.Model(inputs=[input, target], outputs=last)
 
 
 def generator_loss(disc_generated_output, gen_output, target, mode = "BCE"): 
     LAMBDA1 = 10
-    LAMBDA2 = 0.1
+    LAMBDA2 = 0.01
     if mode == "BCE":
         # adversarial loss1(BCE)
         loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
